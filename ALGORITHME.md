@@ -59,7 +59,7 @@ Le nom des indices et des données change à partir de la version 3. Le rôle re
 
 | Rôle | Versions 1–2 (`planning*.py`) | Versions 3–6 |
 |---|---|---|
-| ensemble des camions | `VEHICULES` (V1…V15, 15 camions) | `POINTS` (p1…p15, p18, 16 camions) |
+| ensemble des camions | `VEHICULES` (V1…V15, 15 camions) | `POINTS` (p1…p19, 19 camions) |
 | indice de boucle | `C` | `p` |
 | heure de rendez-vous | `v["T"]` | `v["HRDV"]` |
 | durée de trajet (min) | `v["trajet"]` (donnée) | `trajet(v["km"])` (calculée) |
@@ -96,7 +96,7 @@ pour chaque camion : lire value(a), value(s), value(w) ; départ = a − trajet
 
 À partir de la version 2, les contraintes portent sur ce qui se passe **au même moment** : « au plus `Q` camions sur les quais » et « au plus `file_attente` camions dans la file ». Une contrainte linéaire classique ne peut pas exprimer ce comptage, parce que le temps n'est pas découpé en cases. Il existe deux autres façons de l'écrire :
 
-- créer une variable booléenne par camion et par minute (16 × 1440 variables), puis sommer chaque minute. C'est très lourd et le solveur raisonne mal sur ces variables ;
+- créer une variable booléenne par camion et par minute (19 × 1440 variables), puis sommer chaque minute. C'est très lourd et le solveur raisonne mal sur ces variables ;
 - écrire une disjonction « i avant j ou j avant i » pour chaque paire de camions. Le nombre de booléens croît en n², et cela ne marche que pour un seul quai.
 
 CP-SAT propose un objet adapté à ce cas : la **variable d'intervalle**. Elle relie un début, une durée et une fin, sous la contrainte `début + durée = fin`, et représente la période `[début, fin)`. Un camion produit deux intervalles :
@@ -207,7 +207,7 @@ Explication de l'infaisabilité pour Q = 1 : tous les camions sont arrivés au p
 **Ce qui change par rapport à la version 2 :**
 
 ```
-POINTS : 16 camions (p1…p15, p18), HRDV de 480 (08:00) à 1050 (17:30),
+POINTS : 19 camions (p1…p19), HRDV de 480 (08:00) à 1050 (17:30),
          avec km et formalite (en minutes)
 delta = 20 ; vitesse = 30 (km/h) ; Q = 1 ; file_attente = 2
 
@@ -332,10 +332,10 @@ C'est la première version qui a toujours une solution. L'attente devient nulle 
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `planning.py` | 15 V | `[T−30, T]` | `s ≥ a`, aucune limite de quais | — | min Σw | 0 (sans Q) | 0 (sans Q) | 0 (sans Q) |
 | 2 | `planning_contraintes.py` | 15 V | `[T−30, T]` | `s ≥ a`, ≤ Q quais, file ≤ 2 | `Delta` = 20 | min Σw | INFEASIBLE | w = 5 | w = 0 |
-| 3 | `entrepot.py` | 16 p | `[HRDV−30, HRDV]` | idem | `delta` = 20 | min Σw | w = 70 | w = 0 | w = 0 |
-| 4 | `entrepot_avec_formalite.py` | 16 p | `[HRDV−30, HRDV]` | idem | `delta + formalite` | min Σw | INFEASIBLE | w = 76 | w = 8 |
-| 5 | `version5.py` | 16 p | `[max(360, HRDV−30), HRDV]` | `s ≥ HRDV`, idem | `delta` = 20 | min Σw | INFEASIBLE | w = 50 | w = 20 |
-| 6 | `version6.py` | 16 p | `[max(360, HRDV−30), 1440]` | `s ≥ HRDV`, `r = s − HRDV`, idem | `delta` = 20 | min 1000·Σr + Σw | r = 230, w = 0 | r = 50, w = 0 | r = 20, w = 0 |
+| 3 | `entrepot.py` | 19 p | `[HRDV−30, HRDV]` | idem | `delta` = 20 | min Σw | w = 70 | w = 0 | w = 0 |
+| 4 | `entrepot_avec_formalite.py` | 19 p | `[HRDV−30, HRDV]` | idem | `delta + formalite` | min Σw | INFEASIBLE | w = 76 | w = 8 |
+| 5 | `version5.py` | 19 p | `[max(360, HRDV−30), HRDV]` | `s ≥ HRDV`, idem | `delta` = 20 | min Σw | INFEASIBLE | w = 50 | w = 20 |
+| 6 | `version6.py` | 19 p | `[max(360, HRDV−30), 1440]` | `s ≥ HRDV`, `r = s − HRDV`, idem | `delta` = 20 | min 1000·Σr + Σw | r = 230, w = 0 | r = 50, w = 0 | r = 20, w = 0 |
 
 Les résultats sont donnés en minutes. Les versions 1–2 et 3–6 n'utilisent pas les mêmes données : on ne peut comparer les chiffres qu'à l'intérieur de chaque groupe.
 
@@ -379,6 +379,5 @@ Les résultats sont donnés en minutes. Les versions 1–2 et 3–6 n'utilisent 
 3. **Retard** : `r` mesure le retard du *début de déchargement*, pas de l'arrivée. Est-ce bien la mesure voulue ?
 4. **Ouverture et fermeture** : `ouverture = 360` n'a aucun effet avec ces données, et aucune heure de fermeture n'est imposée. En version 6, un camion pourrait être repoussé jusqu'en fin de journée.
 5. **Test du statut** : les versions 3 à 6 n'en ont pas, et affichent des valeurs fausses quand le problème est infaisable (§ 3). Faut-il le rétablir ?
-6. **Données** : les points p16 et p17 sont absents (on passe de p15 à p18). Est-ce voulu ?
-7. **Temps de calcul** : aucune limite de temps n'est fixée (`max_time_in_seconds`). C'est sans conséquence pour 16 camions, mais à prévoir sur des jeux plus grands.
+6. **Temps de calcul** : aucune limite de temps n'est fixée (`max_time_in_seconds`). C'est sans conséquence pour 19 camions, mais à prévoir sur des jeux plus grands.
 8. **README** : il ne décrit que les versions 1–2, et indique `Q = 3` alors que `planning_contraintes.py` contient `Q = 2`.

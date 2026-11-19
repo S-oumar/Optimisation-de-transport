@@ -41,10 +41,10 @@ L'heure de départ est calculée après la résolution : `départ = a − trajet
 |---|---|---|---|
 | 1 | `planning.py` | 15 véhicules (V1…V15) | Modèle de base, sans quais ni file. Arrivée dans `[T − 30, T]`. |
 | 2 | `planning_contraintes.py` | 15 véhicules | Ajoute la capacité des quais `Q` et la file d'attente (`file_max = 2`). |
-| 3 | `entrepot.py` | 16 points réels (p1…p15, p18) | Données réelles : rendez-vous `HRDV`, distance `km`, trajet calculé à 30 km/h. Même modèle que la version 2. |
-| 4 | `entrepot_avec_formalite.py` | 16 points | Le quai reste occupé pendant `delta + formalite`. Variante non reprise ensuite. |
-| 5 | `version5.py` | 16 points | Repart de la version 3. Pas de déchargement avant `HRDV`, pas d'arrivée avant l'ouverture (06:00). |
-| 6 | `version6.py` | 16 points | Arrivée après `HRDV` autorisée. Le retard `r = s − HRDV` est pénalisé : objectif `1000 × Σr + Σw`. |
+| 3 | `entrepot.py` | 19 points réels (p1…p19) | Données réelles : rendez-vous `HRDV`, distance `km`, trajet calculé à 30 km/h. Même modèle que la version 2. |
+| 4 | `entrepot_avec_formalite.py` | 19 points | Le quai reste occupé pendant `delta + formalite`. Variante non reprise ensuite. |
+| 5 | `version5.py` | 19 points | Repart de la version 3. Pas de déchargement avant `HRDV`, pas d'arrivée avant l'ouverture (06:00). |
+| 6 | `version6.py` | 19 points | Arrivée après `HRDV` autorisée. Le retard `r = s − HRDV` est pénalisé : objectif `1000 × Σr + Σw`. |
 
 ## Utilisation
 
