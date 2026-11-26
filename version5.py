@@ -18,7 +18,6 @@ POINTS = {
     "p13": {"HRDV": 570,  "km": 7.4,  "formalite": 18},
     "p14": {"HRDV": 630,  "km": 22.8, "formalite": 45},
     "p15": {"HRDV": 570,  "km": 4.0,  "formalite": 20},
-    "p18": {"HRDV": 720,  "km": 10.5, "formalite": 0},
     "p16": {"HRDV": 600,  "km": 26.3, "formalite": 20},
     "p17": {"HRDV": 690,  "km": 3.5,  "formalite": 0},
     "p18": {"HRDV": 720,  "km": 10.5, "formalite": 0},
@@ -45,7 +44,7 @@ ouverture = 360
 for p, v in POINTS.items():
 
     a[p] = m.new_int_var(max(ouverture,v["HRDV"] - avance_max), v["HRDV"], f"a_{p}")
-    s[p] = m.new_int_var(v["HRDV"], 1440, f"s_{p}")
+    s[p] = m.new_int_var(v["HRDV"], 1440, f"s_{p}")  # déchargement interdit avant le rendez-vous HRDV
     w[p] = m.new_int_var(0, 1440, f"w_{p}")  
 
     m.add(s[p] >= a[p])

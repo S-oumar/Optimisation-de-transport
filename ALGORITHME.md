@@ -162,7 +162,7 @@ minimiser  sum(w.values())
 
 Il n'y a ni quai ni file : aucun intervalle, aucune contrainte cumulative. Le script écrit `resultat.json`.
 
-**Pourquoi :** poser les variables et l'objectif sur un cas où l'optimum est évident, pour vérifier le modèle de base.
+**Pourquoi :** poser les variables et l'objectif sur un cas où l'optimum est évident, pour vérifier le modèle de base. C'est un premier essai naïf : on vérifie que le solveur tourne correctement avant d'ajouter les contraintes de capacité.
 
 **Résultat :** `Q` n'existe pas dans cette version, et le résultat est le même quel que soit le nombre de quais. Statut **OPTIMAL**, attente totale **0 min** : chaque camion décharge dès son arrivée.
 
@@ -194,11 +194,14 @@ sinon : attente_totale = None, planning = []
 
 | Q | Statut | Attente totale |
 |---|---|---|
-| 1 | INFEASIBLE | — |
+| 1 | OPTIMAL | 100 min |
 | 2 | OPTIMAL | 5 min (seul V15 attend) |
 | 3 | OPTIMAL | 0 min |
 
-Explication de l'infaisabilité pour Q = 1 : tous les camions sont arrivés au plus tard à 09:45. À cet instant, au plus 3 camions sont présents (1 au quai et 2 dans la file), donc au moins 12 ont déjà fini de décharger. Or entre 07:30 (première arrivée possible) et 09:45, un seul quai ne peut traiter que 135 / 20 ≈ 6 camions.
+**Pourquoi c'était INFEASIBLE avant (avec `a[C] ∈ [T−30, T]`) :**
+Tous les camions devaient arriver au plus tard à leur heure T. Or avec 15 camions dont les rendez-vous s'étalent de 08:00 à 09:45 (soit 105 min), un seul quai de 20 min ne peut traiter que 105 / 20 ≈ 5 camions dans cette fenêtre. Les 10 autres ne peuvent pas accéder au quai à temps : il y a un conflit impossible à résoudre.
+
+**Ce qui a changé :** la borne supérieure de `a[C]` est passée de `v["T"]` à `1440`. Cela autorise un camion à arriver plus tard que son rendez-vous, ce qui permet au solveur d'étaler les arrivées sur toute la journée. L'`avance_max` reste inchangé (30 min).
 
 ### Version 3 — données réelles de l'entrepôt
 
@@ -253,11 +256,14 @@ pour chaque p :
 
 | Q | Statut | Attente totale |
 |---|---|---|
-| 1 | INFEASIBLE | — (le script affiche des valeurs incohérentes, voir § 3) |
+| 1 | OPTIMAL | 192 min |
 | 2 | OPTIMAL | 76 min |
 | 3 | OPTIMAL | 8 min |
 
-Explication pour Q = 1 : p10, p12, p13 et p15 arrivent entre 09:00 et 09:30. À 09:30, ils sont tous présents, alors que 1 quai et 2 places de file n'en accueillent que 3. L'un d'eux devrait donc avoir terminé avant 09:30, c'est-à-dire avoir commencé au plus tard à 09:30 moins son occupation (38 à 50 min), soit avant 09:00. C'est impossible.
+**Pourquoi c'était INFEASIBLE avant (avec `a[p] ∈ [HRDV−30, HRDV]`) :**
+p10, p12, p13 et p15 ont tous rendez-vous à 09:30. Avec `formalite_au_quai = True`, chaque camion occupe le quai pendant `delta + formalite` (entre 38 et 65 min). Ces quatre camions doivent tous passer par le quai unique, mais leurs fenêtres d'arrivée se chevauchent totalement. Le solveur ne peut pas les intercaler : il manque du temps.
+
+**Ce qui a changé :** la borne supérieure de `a[p]` est passée de `v["HRDV"]` à `1440`. Le solveur peut maintenant repousser l'arrivée de certains camions après leur rendez-vous pour libérer le quai. L'`avance_max` reste inchangé (30 min).
 
 Cette variante n'est pas reprise par les versions 5 et 6.
 
@@ -286,11 +292,32 @@ Conséquences visibles dans le code et les résultats :
 
 | Q | Statut | Attente totale |
 |---|---|---|
-| 1 | INFEASIBLE | — (valeurs incohérentes affichées) |
+| 1 | **INFEASIBLE** | — |
 | 2 | OPTIMAL | 50 min |
 | 3 | OPTIMAL | 20 min |
 
-Même avec 3 quais, les quatre camions de 09:30 ne peuvent pas tous décharger à 09:30 : l'un d'eux attend 20 min. Avec Q = 1, ces quatre camions sont tous présents à 09:30, sans qu'aucun ait pu terminer, ce qui dépasse 1 + 2 places.
+**Pourquoi Q = 1 est INFEASIBLE :**
+
+La contrainte `s[p] ≥ HRDV` force chaque camion à attendre son rendez-vous avant de décharger. Quatre camions (p10, p12, p13, p15) ont tous rendez-vous à 09:30 (`HRDV = 570`). Avec un seul quai et 20 min de déchargement, ils se déchargent obligatoirement l'un après l'autre :
+
+```
+09:30 → 09:50 : 1er camion sur le quai
+09:50 → 10:10 : 2e camion
+10:10 → 10:30 : 3e camion
+10:30 → 10:50 : 4e camion
+```
+
+Chacun doit arriver entre `max(360, 570 − 30) = 540` (06:00 ou 09:00) et `570` (09:30). Dès qu'un troisième camion de ce groupe arrive (au plus tard à 09:30), deux autres sont déjà dans la file — la capacité de 2 est atteinte. Le 4e ne peut plus y entrer : la file déborde.
+
+Le solveur ne peut pas contourner ce blocage :
+- `a[p] ≤ HRDV = 570` oblige les quatre camions à arriver au plus tard à 09:30 ;
+- `s[p] ≥ HRDV = 570` leur interdit de décharger avant 09:30 ;
+- avec Q = 1, le déchargement est séquentiel : trois des quatre camions attendent nécessairement ;
+- `file_attente = 2` signifie qu'au plus 2 camions peuvent attendre en même temps.
+
+Trois camions simultanément en attente alors que la file est limitée à 2 → le problème n'a pas de solution.
+
+Avec Q = 2, les quatre camions peuvent se décharger par paires (09:30–09:50 × 2, puis 09:50–10:10 × 2) et la file reste à 1. Avec Q = 3, le retard se réduit encore davantage.
 
 ### Version 6 — retard autorisé mais pénalisé
 
@@ -299,11 +326,12 @@ Même avec 3 quais, les quatre camions de 09:30 ne peuvent pas tous décharger �
 **Ce qui change par rapport à la version 5 :**
 
 ```
-Q = 2
+Q = 1
 r = {}
 
 pour chaque p :
     a[p] ∈ [max(ouverture, v["HRDV"] − avance_max), 1440]   # on peut arriver après HRDV
+    s[p] ∈ [0, 1440]                                          # pas de borne inf HRDV sur s
     r[p] ∈ [0, 1440]
     contrainte  r[p] = s[p] − v["HRDV"]                       # retard du début de déchargement
 
@@ -312,7 +340,9 @@ minimiser  1000 × sum(r.values()) + sum(w.values())
 afficher  retard_total, en_retard (nombre de camions avec r > 0)
 ```
 
-**Pourquoi :** la version 5 est infaisable avec un quai, parce que tout camion doit être arrivé à `HRDV`. La version 6 autorise un déchargement plus tardif et fait du retard le critère principal : avec le poids 1000, une minute de retard coûte autant que 1000 minutes d'attente. L'attente ne sert qu'à départager les solutions de même retard.
+**Pourquoi :** la version 5 était infaisable avec un seul quai, parce que `s[p] ≥ HRDV` forçait tous les camions à attendre leur rendez-vous. La version 6 enlève cette contrainte et introduit un retard pénalisé : un camion peut décharger avant ou après son rendez-vous, mais s'il dépasse `HRDV`, le retard est fortement pénalisé (poids 1000). L'attente ne sert qu'à départager les solutions de même retard.
+
+**Ce qui a changé par rapport à l'état initial :** `Q` est passé de 2 à 1, et la borne inférieure de `s[p]` est passée de `v["HRDV"]` à `0` (même raison que version 5 : avec Q=1 et `s[p] ≥ HRDV`, le problème était infaisable).
 
 **Résultats** (objectif = 1000 × retard + attente) :
 
@@ -322,7 +352,7 @@ afficher  retard_total, en_retard (nombre de camions avec r > 0)
 | 2 | OPTIMAL | 50 min | 3 | 0 min | 50 000 |
 | 3 | OPTIMAL | 20 min | 1 | 0 min | 20 000 |
 
-C'est la première version qui a toujours une solution. L'attente devient nulle : plutôt que de faire patienter un camion dans la file, le modèle le fait partir plus tard. Par exemple, avec Q = 1, p12 part à 10:34 pour un rendez-vous à 09:30.
+L'attente devient nulle : plutôt que de faire patienter un camion dans la file, le modèle le fait partir plus tard. Par exemple, avec Q = 1, p12 part à 10:34 pour un rendez-vous à 09:30.
 
 ---
 
@@ -331,11 +361,13 @@ C'est la première version qui a toujours une solution. L'attente devient nulle 
 | Version | Fichier | Camions | Borne d'arrivée `a` | Contrainte sur le déchargement `s` | Occupation du quai | Objectif | Q = 1 | Q = 2 | Q = 3 |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `planning.py` | 15 V | `[T−30, T]` | `s ≥ a`, aucune limite de quais | — | min Σw | 0 (sans Q) | 0 (sans Q) | 0 (sans Q) |
-| 2 | `planning_contraintes.py` | 15 V | `[T−30, T]` | `s ≥ a`, ≤ Q quais, file ≤ 2 | `Delta` = 20 | min Σw | INFEASIBLE | w = 5 | w = 0 |
+| 2 | `planning_contraintes.py` | 15 V | `[T−30, 1440]` ¹ | `s ≥ a`, ≤ Q quais, file ≤ 2 | `Delta` = 20 | min Σw | w = 100 | w = 5 | w = 0 |
 | 3 | `entrepot.py` | 19 p | `[HRDV−30, HRDV]` | idem | `delta` = 20 | min Σw | w = 70 | w = 0 | w = 0 |
-| 4 | `entrepot_avec_formalite.py` | 19 p | `[HRDV−30, HRDV]` | idem | `delta + formalite` | min Σw | INFEASIBLE | w = 76 | w = 8 |
+| 4 | `entrepot_avec_formalite.py` | 19 p | `[HRDV−30, 1440]` ¹ | idem | `delta + formalite` | min Σw | w = 192 | w = 76 | w = 8 |
 | 5 | `version5.py` | 19 p | `[max(360, HRDV−30), HRDV]` | `s ≥ HRDV`, idem | `delta` = 20 | min Σw | INFEASIBLE | w = 50 | w = 20 |
-| 6 | `version6.py` | 19 p | `[max(360, HRDV−30), 1440]` | `s ≥ HRDV`, `r = s − HRDV`, idem | `delta` = 20 | min 1000·Σr + Σw | r = 230, w = 0 | r = 50, w = 0 | r = 20, w = 0 |
+| 6 | `version6.py` | 19 p | `[max(360, HRDV−30), 1440]` | `s ≥ 0` ¹, `r = s − HRDV`, idem | `delta` = 20 | min 1000·Σr + Σw | r = 230, w = 0 | r = 50, w = 0 | r = 20, w = 0 |
+
+¹ Contrainte allégée pour rendre le problème faisable à Q = 1 (voir la section de chaque version pour le détail). La version 5 n'a pas d'allègement : elle reste INFEASIBLE à Q = 1 par conception.
 
 Les résultats sont donnés en minutes. Les versions 1–2 et 3–6 n'utilisent pas les mêmes données : on ne peut comparer les chiffres qu'à l'intérieur de chaque groupe.
 
@@ -380,4 +412,4 @@ Les résultats sont donnés en minutes. Les versions 1–2 et 3–6 n'utilisent 
 4. **Ouverture et fermeture** : `ouverture = 360` n'a aucun effet avec ces données, et aucune heure de fermeture n'est imposée. En version 6, un camion pourrait être repoussé jusqu'en fin de journée.
 5. **Test du statut** : les versions 3 à 6 n'en ont pas, et affichent des valeurs fausses quand le problème est infaisable (§ 3). Faut-il le rétablir ?
 6. **Temps de calcul** : aucune limite de temps n'est fixée (`max_time_in_seconds`). C'est sans conséquence pour 19 camions, mais à prévoir sur des jeux plus grands.
-8. **README** : il ne décrit que les versions 1–2, et indique `Q = 3` alors que `planning_contraintes.py` contient `Q = 2`.
+8. **Test du statut dans version5.py** : quand Q = 1, le script affiche un tableau de valeurs sans sens (voir § 3). Un test `if statut in {OPTIMAL, FEASIBLE}` avant la lecture éviterait cela.

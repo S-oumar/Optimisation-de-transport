@@ -18,7 +18,6 @@ POINTS = {
     "p13": {"HRDV": 570,  "km": 7.4,  "formalite": 18},
     "p14": {"HRDV": 630,  "km": 22.8, "formalite": 45},
     "p15": {"HRDV": 570,  "km": 4.0,  "formalite": 20},
-    "p18": {"HRDV": 720,  "km": 10.5, "formalite": 0},
     "p16": {"HRDV": 600,  "km": 26.3, "formalite": 20},
     "p17": {"HRDV": 690,  "km": 3.5,  "formalite": 0},
     "p18": {"HRDV": 720,  "km": 10.5, "formalite": 0},

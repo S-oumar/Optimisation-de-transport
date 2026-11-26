@@ -1,8 +1,45 @@
 # Planification des arrivées de véhicules sur quais de déchargement
 
-Modèle d'optimisation par **programmation par contraintes** (Google OR-Tools, solveur CP-SAT). Pour chaque camion, il calcule l'heure d'arrivée et l'heure de début de déchargement à un entrepôt qui a un nombre limité de quais et une file d'attente limitée, puis en déduit l'heure de départ.
+Modèle d'optimisation par **programmation par contraintes** (Google OR-Tools, solveur CP-SAT).  
+Le programme calcule les horaires optimaux d'arrivée et de déchargement de camions dans un entrepôt à quais limités, en minimisant le temps d'attente total.
 
-Le projet comporte six versions successives du modèle. Chacune ajoute ou modifie une règle par rapport à la précédente. Le détail du modèle (pseudo-code, différences entre versions, explications) est dans [`ALGORITHME.md`](ALGORITHME.md).
+Le détail complet du modèle, le pseudo-code, les explications techniques et les correspondances OR-Tools sont dans [`ALGORITHME.md`](ALGORITHME.md).
+
+---
+
+## Le problème
+
+Un entrepôt reçoit des camions tout au long de la journée pour des opérations de déchargement. Le problème est le suivant :
+
+- Chaque camion a un **rendez-vous** (noté `HRDV` ou `T` selon la version), exprimé en minutes depuis minuit (`480` = 08:00, `570` = 09:30, etc.).
+- L'entrepôt dispose d'un nombre limité de **quais de déchargement** (`Q`). Un quai est occupé pendant toute la durée du déchargement (`delta = 20 min`).
+- Si tous les quais sont occupés à l'arrivée d'un camion, ce camion attend dans une **file d'attente** dont la capacité est limitée (`file_attente = 2` : au plus 2 camions en attente simultanément).
+- Un camion peut arriver au plus 30 minutes avant son rendez-vous (`avance_max = 30`).
+
+Le programme détermine, pour chaque camion :
+- **quand il arrive** à l'entrepôt (heure d'arrivée `a`) ;
+- **quand il commence à décharger** (heure de début `s`) ;
+- **son temps d'attente** dans la file (`w = s − a`).
+
+L'heure de départ du dépôt est calculée après coup : `départ = a − durée_de_trajet`.
+
+**Objectif :** minimiser la somme des temps d'attente de tous les camions.
+
+### Pourquoi ce problème est difficile
+
+Le cas concret illustre bien la difficulté : avec les données réelles de l'entrepôt (versions 3 à 6), quatre camions — p10, p12, p13 et p15 — ont **tous rendez-vous à 09:30**. Avec un seul quai et 20 minutes de déchargement, ces quatre camions ne peuvent pas décharger en même temps. L'un d'eux doit attendre que le précédent ait terminé. Et si plusieurs attendent en même temps, la file (limitée à 2 places) peut déborder.
+
+Le solveur CP-SAT explore intelligemment toutes les ordonnances possibles pour trouver celle qui minimise l'attente totale — ou déclare le problème infaisable si aucune ne respecte toutes les contraintes.
+
+---
+
+## Approche : six versions progressives
+
+Le modèle a été développé en **six versions**. Chaque version part de la précédente et ajoute ou modifie une contrainte pour coller à une réalité de plus en plus précise. Cette progression permet de comprendre l'impact de chaque contrainte sur la faisabilité et les temps d'attente.
+
+Certaines versions sont **INFEASIBLE** (aucune solution n'existe) pour un seul quai (`Q = 1`) : cela montre que la contrainte ajoutée est trop restrictive pour être satisfaite avec une seule ressource. Pour les rendre faisables, on a allégé une contrainte (borne d'arrivée ou borne de déchargement). La **version 5** fait exception : elle reste délibérément INFEASIBLE à Q = 1, car c'est son comportement intentionnel — il illustre ce qui se passe quand on exige que le déchargement ne commence jamais avant le rendez-vous.
+
+---
 
 ## Installation
 
@@ -16,35 +53,172 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-La seule dépendance est `ortools`. La version testée est 9.15.6755, avec Python 3.13.
+Dépendance unique : `ortools` (testé en version 9.15.6755 avec Python 3.13).
 
-## Le modèle en bref
-
-Toutes les heures sont en minutes depuis minuit (`480` = 08:00). Pour chaque camion :
-
-- `a` : heure d'arrivée ;
-- `s` : heure de début de déchargement, avec `s ≥ a` ;
-- `w = s − a` : temps d'attente dans la file.
-
-Contraintes, à partir de la version 2 :
-
-- **Capacité des quais** : au plus `Q` déchargements en même temps (`add_cumulative`) ;
-- **Taille de la file** : au plus 2 camions en attente en même temps (`add_cumulative`).
-
-Objectif : minimiser l'attente totale `Σ w`. La version 6 minimise d'abord le retard.
-
-L'heure de départ est calculée après la résolution : `départ = a − trajet`.
+---
 
 ## Les six versions
 
-| Version | Fichier | Données | Ce qui change |
-|---|---|---|---|
-| 1 | `planning.py` | 15 véhicules (V1…V15) | Modèle de base, sans quais ni file. Arrivée dans `[T − 30, T]`. |
-| 2 | `planning_contraintes.py` | 15 véhicules | Ajoute la capacité des quais `Q` et la file d'attente (`file_max = 2`). |
-| 3 | `entrepot.py` | 19 points réels (p1…p19) | Données réelles : rendez-vous `HRDV`, distance `km`, trajet calculé à 30 km/h. Même modèle que la version 2. |
-| 4 | `entrepot_avec_formalite.py` | 19 points | Le quai reste occupé pendant `delta + formalite`. Variante non reprise ensuite. |
-| 5 | `version5.py` | 19 points | Repart de la version 3. Pas de déchargement avant `HRDV`, pas d'arrivée avant l'ouverture (06:00). |
-| 6 | `version6.py` | 19 points | Arrivée après `HRDV` autorisée. Le retard `r = s − HRDV` est pénalisé : objectif `1000 × Σr + Σw`. |
+### Version 1 — `planning.py` : modèle de base, sans contrainte de capacité
+
+**Données :** 15 véhicules (V1 à V15), rendez-vous de 08:00 à 09:45 (espacés d'environ 8 min), durée de trajet fournie directement.
+
+Ce premier modèle ne représente aucune contrainte de capacité : il n'y a ni quai ni file d'attente. Chaque camion peut arriver entre `T − 30` et `T`, et décharge dès son arrivée. Sans aucun conflit de ressource, l'optimum est trivial : tous les camions arrivent exactement à leur rendez-vous et attendent 0 minute.
+
+**Résultat :** attente totale = **0 min** (quel que soit Q, puisque le modèle l'ignore).
+
+**But :** valider les briques de base du modèle — variables `a`, `s`, `w`, contrainte `s ≥ a`, objectif `min Σw` — avant d'ajouter la complexité des quais.
+
+---
+
+### Version 2 — `planning_contraintes.py` : ajout des quais et de la file d'attente
+
+**Données :** mêmes 15 véhicules.
+
+Cette version introduit les deux contraintes de capacité clés du modèle :
+- **Capacité des quais :** au plus `Q` camions déchargent en même temps (`add_cumulative` sur les intervalles de déchargement).
+- **Taille de la file :** au plus 2 camions attendent en même temps (`add_cumulative` sur les intervalles d'attente).
+
+La borne supérieure de l'arrivée a été élargie à 1440 (toute la journée, au lieu de `T`) pour que le problème reste faisable à Q = 1 : avec seulement 15 camions et des rendez-vous étalés sur 1 h 45, un seul quai ne peut pas les traiter tous dans la fenêtre `[T−30, T]`.
+
+**Résultats :**
+
+| Q | Statut | Attente totale |
+|---|---|---|
+| 1 | OPTIMAL | 100 min |
+| 2 | OPTIMAL | 5 min (seul V15 attend) |
+| 3 | OPTIMAL | 0 min |
+
+**Ce qu'on observe :** avec 2 quais, presque tout le monde est servi immédiatement. Avec 3 quais, l'attente disparaît complètement.
+
+---
+
+### Version 3 — `entrepot.py` : données réelles de l'entrepôt
+
+**Données :** 19 points réels (p1 à p19), rendez-vous de 08:00 (480 min) à 17:30 (1050 min), distance en km. La durée de trajet est calculée à vitesse constante de 30 km/h.
+
+Même modèle que la version 2. Seules changent les données : plus de camions, rendez-vous étalés sur toute la journée. Le champ `formalite` est présent dans les données mais n'est pas encore utilisé.
+
+**Point critique :** quatre camions — p10, p12, p13, p15 — ont tous `HRDV = 570` (09:30). Ce pic crée la situation la plus tendue avec un seul quai.
+
+**Résultats :**
+
+| Q | Statut | Attente totale |
+|---|---|---|
+| 1 | OPTIMAL | 70 min (p12 : 50 min, p10 : 10 min, p14 : 10 min) |
+| 2 | OPTIMAL | 0 min |
+| 3 | OPTIMAL | 0 min |
+
+**Ce qu'on observe :** avec Q = 1, le solveur décharge les 4 camions de 09:30 l'un après l'autre, ce qui oblige certains à attendre. Avec 2 quais, 2 camions déchargent en parallèle et l'attente disparaît. Le goulot d'étranglement à Q = 1 vient entièrement du pic de 09:30.
+
+---
+
+### Version 4 — `entrepot_avec_formalite.py` : formalité administrative au quai
+
+**Données :** mêmes 19 points.
+
+La formalité administrative (entre 0 et 45 min selon le camion) est ajoutée au temps d'occupation du quai. Chaque camion occupe le quai pendant `delta + formalite` minutes au lieu de `delta = 20` min seules. Par exemple, p5 avec `formalite = 45` min occupe le quai pendant 65 min.
+
+Conséquence : les camions occupent le quai **beaucoup plus longtemps**, ce qui crée davantage de conflits. La borne supérieure de l'arrivée a également été élargie à 1440 pour que le problème reste faisable à Q = 1.
+
+**Résultats :**
+
+| Q | Statut | Attente totale |
+|---|---|---|
+| 1 | OPTIMAL | 192 min |
+| 2 | OPTIMAL | 76 min |
+| 3 | OPTIMAL | 8 min |
+
+**Ce qu'on observe :** l'attente explose à Q = 1 (192 min contre 70 min en v3) car le quai est occupé jusqu'à 65 min d'affilée, ce qui bloque tous les camions suivants. Même avec 3 quais, 8 min d'attente subsistent — contre 0 en version 3 — à cause des longues formalités.
+
+Cette variante n'est pas reprise dans les versions 5 et 6, qui repartent de la version 3.
+
+---
+
+### Version 5 — `version5.py` : déchargement interdit avant le rendez-vous
+
+**Données :** mêmes 19 points. Repart de la version 3 (sans formalité).
+
+Une nouvelle contrainte est ajoutée : le déchargement **ne peut pas commencer avant l'heure de rendez-vous** (`s[p] ≥ HRDV`). Dans les versions précédentes, le solveur pouvait faire décharger un camion jusqu'à 30 minutes en avance (arriver à 09:00, décharger à 09:00 pour un rendez-vous à 09:30). Cette version l'interdit : un camion arrivé en avance doit attendre son heure.
+
+De plus, l'arrivée ne peut pas avoir lieu avant l'ouverture du site (`ouverture = 06:00`).
+
+**À Q = 1, cette version est INFEASIBLE.** Voir ci-dessous.
+
+**Résultats :**
+
+| Q | Statut | Attente totale |
+|---|---|---|
+| 1 | **INFEASIBLE** | — |
+| 2 | OPTIMAL | 50 min |
+| 3 | OPTIMAL | 20 min |
+
+#### Pourquoi Q = 1 est infaisable ici ?
+
+Les quatre camions p10, p12, p13 et p15 ont tous `HRDV = 570` (09:30). La contrainte `s[p] ≥ HRDV = 570` les oblige à commencer leur déchargement **au plus tôt à 09:30**.
+
+Avec un seul quai et 20 minutes par camion, la seule façon de les décharger tous est de les séquencer :
+
+```
+09:30 → 09:50 : 1er camion sur le quai
+09:50 → 10:10 : 2e camion
+10:10 → 10:30 : 3e camion
+10:30 → 10:50 : 4e camion
+```
+
+Pendant ce temps, les trois camions qui attendent leur tour sont dans la file. Or la contrainte `a[p] ≤ HRDV = 570` oblige les quatre camions à arriver au plus tard à 09:30 — ils sont tous là avant même que le premier ait fini de décharger. Dès que le 3e camion arrive (au plus tard à 09:30), la file contient 3 camions simultanément, ce qui dépasse la capacité de 2 : **la file déborde**.
+
+Le solveur ne peut pas contourner ce problème :
+- Il ne peut pas faire arriver les camions plus tard : `a[p] ≤ HRDV` est une contrainte dure.
+- Il ne peut pas les faire décharger en avance : `s[p] ≥ HRDV` l'en empêche.
+- Il ne peut pas décharger deux camions en parallèle : Q = 1.
+
+**Avec Q = 2**, deux camions déchargent en parallèle de 09:30 à 09:50, puis deux autres de 09:50 à 10:10. La file ne contient jamais plus de 2 camions → faisable, avec 50 min d'attente au total. **Avec Q = 3**, trois camions déchargent ensemble de 09:30 à 09:50, le 4e attend 20 min → 20 min d'attente.
+
+---
+
+### Version 6 — `version6.py` : retard autorisé, fortement pénalisé
+
+**Données :** mêmes 19 points.
+
+Cette version résout le problème d'infaisabilité de la version 5 en supprimant les deux bornes restrictives :
+- La borne supérieure de `a[p]` passe de `HRDV` à `1440` : un camion peut arriver **après** son rendez-vous.
+- La borne inférieure de `s[p]` passe de `HRDV` à `0` : un camion peut décharger avant son rendez-vous.
+
+À la place, un **retard** `r[p] = s[p] − HRDV` est introduit et **fortement pénalisé** dans l'objectif :
+
+```
+minimiser  1000 × Σr + Σw
+```
+
+Le poids 1000 fait qu'une minute de retard coûte autant que 1000 minutes d'attente. Le solveur préfère donc systématiquement retarder l'arrivée d'un camion (retard 0 mais arrivée tardive) plutôt que de le laisser dans la file (attente positive).
+
+**Résultats** (objectif = 1000 × retard total + attente totale) :
+
+| Q | Statut | Retard total | Camions en retard | Attente totale |
+|---|---|---|---|---|
+| 1 | OPTIMAL | 230 min | 5 | 0 min |
+| 2 | OPTIMAL | 50 min | 3 | 0 min |
+| 3 | OPTIMAL | 20 min | 1 | 0 min |
+
+**Ce qu'on observe :** l'attente est toujours nulle — le solveur préfère systématiquement retarder l'arrivée d'un camion plutôt que de le laisser patienter dans la file. Avec Q = 1, 5 camions arrivent après leur rendez-vous pour un retard total de 230 min. Plus on ajoute de quais, moins il faut de retard.
+
+---
+
+## Récapitulatif des résultats
+
+| Version | Fichier | Q = 1 | Q = 2 | Q = 3 |
+|---|---|---|---|---|
+| 1 — Modèle de base | `planning.py` | 0 (sans quais) | 0 | 0 |
+| 2 — Quais + file | `planning_contraintes.py` | w = 100 min | w = 5 min | w = 0 |
+| 3 — Données réelles | `entrepot.py` | w = 70 min | w = 0 | w = 0 |
+| 4 — Formalité au quai | `entrepot_avec_formalite.py` | w = 192 min | w = 76 min | w = 8 min |
+| 5 — Pas de déchargement avant HRDV | `version5.py` | **INFEASIBLE** | w = 50 min | w = 20 min |
+| 6 — Retard pénalisé | `version6.py` | r = 230 min (5 camions), w = 0 | r = 50 min (3 camions), w = 0 | r = 20 min (1 camion), w = 0 |
+
+> Les versions 1–2 et 3–6 n'utilisent pas les mêmes données (15 vs 19 camions) : les chiffres ne se comparent qu'à l'intérieur de chaque groupe.
+
+---
 
 ## Utilisation
 
@@ -55,35 +229,15 @@ python planning.py                  # version 1, écrit resultat.json
 python planning_contraintes.py      # version 2, écrit resultat_Q{Q}.json
 python entrepot.py                  # version 3, affiche un tableau
 python entrepot_avec_formalite.py   # version 4, affiche un tableau
-python version5.py                  # version 5, affiche un tableau
-python version6.py                  # version 6, affiche le tableau, le retard total et le nombre de camions en retard
+python version5.py                  # version 5, INFEASIBLE à Q = 1 (affiche quand même un tableau sans sens)
+python version6.py                  # version 6, affiche tableau + retard total + nombre de camions en retard
 ```
 
-Le nombre de quais se règle en modifiant la ligne `Q = …` du script. Valeurs actuelles : `Q = 2` dans `planning_contraintes.py` et `version6.py`, `Q = 1` dans `entrepot.py`, `entrepot_avec_formalite.py` et `version5.py`.
+Le nombre de quais se règle en modifiant la ligne `Q = …` dans le script. Valeurs actuelles : `Q = 1` dans tous les scripts.
 
-> **Attention :** seul `planning_contraintes.py` vérifie le statut du solveur avant de lire la solution. Les versions 3 à 6 affichent le tableau dans tous les cas. Si la première ligne affichée est `INFEASIBLE`, il n'existe aucune solution et les valeurs du tableau n'ont aucun sens.
+> **Attention :** seul `planning_contraintes.py` vérifie le statut du solveur avant de lire la solution. Pour les versions 3 à 6, si la première ligne affichée est `INFEASIBLE`, les valeurs du tableau n'ont aucun sens. C'est notamment le cas de `version5.py` avec `Q = 1` : le tableau affiché contient des nombres arbitraires.
 
-## Résultats
-
-Résultats obtenus pour Q = 1, 2 et 3 quais, avec une file limitée à 2 camions. Les chiffres sont des attentes totales en minutes. Pour la version 6, `r` est le retard total et `w` l'attente totale.
-
-| Version | Q = 1 | Q = 2 | Q = 3 |
-|---|---|---|---|
-| 1 — `planning.py` | 0 (pas de quais dans le modèle) | 0 | 0 |
-| 2 — `planning_contraintes.py` | INFEASIBLE | 5 | 0 |
-| 3 — `entrepot.py` | 70 | 0 | 0 |
-| 4 — `entrepot_avec_formalite.py` | INFEASIBLE | 76 | 8 |
-| 5 — `version5.py` | INFEASIBLE | 50 | 20 |
-| 6 — `version6.py` | r = 230 (5 camions), w = 0 | r = 50 (3 camions), w = 0 | r = 20 (1 camion), w = 0 |
-
-Les versions 1–2 et 3–6 n'utilisent pas les mêmes données : on ne compare les chiffres qu'à l'intérieur de chaque groupe.
-
-Ce qu'on en retient :
-
-- **Données de test (versions 1–2).** Un seul quai ne suffit pas : 15 déchargements de 20 minutes ne tiennent pas dans les fenêtres d'arrivée avec une file de 2. Avec 2 quais, il reste 5 minutes d'attente (V15). Avec 3 quais, il n'y en a plus.
-- **Données réelles (versions 3–6).** Quatre camions ont rendez-vous à 09:30 (p10, p12, p13, p15), et c'est ce pic qui fixe le besoin en quais. Si la formalité occupe le quai (version 4) ou si l'on interdit de décharger avant le rendez-vous (version 5), un quai ne suffit plus. La version 6 trouve toujours une solution, au prix d'un retard d'autant plus faible qu'il y a de quais.
-
-Les plannings détaillés des versions 1 et 2 sont dans les fichiers JSON ci-dessous. L'analyse de chaque cas, y compris les raisons des infaisabilités, est dans [`ALGORITHME.md`](ALGORITHME.md).
+---
 
 ## Format de sortie JSON (versions 1 et 2)
 
@@ -106,7 +260,9 @@ Les plannings détaillés des versions 1 et 2 sont dans les fichiers JSON ci-des
 }
 ```
 
-Les champs `quais` et `file_max` n'existent qu'en version 2. Si aucune solution n'existe (statut `INFEASIBLE`), `attente_totale` vaut `null` et `planning` est vide.
+Si le problème est infaisable, `attente_totale` vaut `null` et `planning` est vide. Les champs `quais` et `file_max` n'existent que dans la version 2.
+
+---
 
 ## Structure du projet
 
@@ -116,12 +272,12 @@ Les champs `quais` et `file_max` n'existent qu'en version 2. Si aucune solution 
 ├── planning_contraintes.py      # V2 : quais (Q) et file d'attente
 ├── entrepot.py                  # V3 : données réelles de l'entrepôt
 ├── entrepot_avec_formalite.py   # V4 : formalité comptée dans l'occupation du quai
-├── version5.py                  # V5 : déchargement au plus tôt à HRDV, ouverture 06:00
-├── version6.py                  # V6 : retard autorisé, pénalisé dans l'objectif
+├── version5.py                  # V5 : déchargement au plus tôt à HRDV (infaisable à Q = 1)
+├── version6.py                  # V6 : retard autorisé, fortement pénalisé
 ├── resultat.json                # V1
-├── resultat_Q1.json             # V2, Q = 1 (infaisable)
-├── resultat_Q2.json             # V2, Q = 2
-├── resultat_Q3.json             # V2, Q = 3
+├── resultat_Q1.json             # V2, Q = 1 (w = 100)
+├── resultat_Q2.json             # V2, Q = 2 (w = 5)
+├── resultat_Q3.json             # V2, Q = 3 (w = 0)
 ├── ALGORITHME.md                # description détaillée du modèle et des versions
 ├── requirements.txt
 └── README.md

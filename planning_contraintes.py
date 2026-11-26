@@ -24,8 +24,8 @@ VEHICULES = {
 }
 
 avance_max = 30
-Q = 2      
-file_max = 2   
+Q = 1        # 1 seul quai de déchargement
+file_max = 2  # au plus 2 camions en attente en même temps
 
 attentes, dechargements = [], []
 
@@ -36,7 +36,7 @@ def hhmm(minutes):
 
 
 for C, v in VEHICULES.items():
-    a[C] = m.new_int_var(v["T"] - avance_max, v["T"], f"a_{C}")
+    a[C] = m.new_int_var(v["T"] - avance_max, 1440, f"a_{C}")  # borne sup à 1440 : on autorise les arrivées tardives pour que Q=1 reste faisable
     s[C] = m.new_int_var(0, 1440, f"s_{C}")
     w[C] = m.new_int_var(0, 1440, f"w_{C}")
     m.add(s[C] >= a[C]) 
