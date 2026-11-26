@@ -85,11 +85,11 @@ La borne supérieure de l'arrivée a été élargie à 1440 (toute la journée, 
 
 | Q | Statut | Attente totale |
 |---|---|---|
-| 1 | OPTIMAL | 100 min |
-| 2 | OPTIMAL | 5 min (seul V15 attend) |
+| 1 | OPTIMAL | 0 min |
+| 2 | OPTIMAL | 0 min |
 | 3 | OPTIMAL | 0 min |
 
-**Ce qu'on observe :** avec 2 quais, presque tout le monde est servi immédiatement. Avec 3 quais, l'attente disparaît complètement.
+**Ce qu'on observe :** quel que soit le nombre de quais (1, 2 ou 3), personne n'attend : la borne d'arrivée élargie à 1440 permet au solveur d'étaler les arrivées sur toute la journée, éliminant tout conflit.
 
 ---
 
@@ -105,11 +105,11 @@ Même modèle que la version 2. Seules changent les données : plus de camions, 
 
 | Q | Statut | Attente totale |
 |---|---|---|
-| 1 | OPTIMAL | 70 min (p12 : 50 min, p10 : 10 min, p14 : 10 min) |
+| 1 | OPTIMAL | 130 min (p13 : 70 min, p14 : 30 min, p16 : 20 min, p10 : 10 min) |
 | 2 | OPTIMAL | 0 min |
 | 3 | OPTIMAL | 0 min |
 
-**Ce qu'on observe :** avec Q = 1, le solveur décharge les 4 camions de 09:30 l'un après l'autre, ce qui oblige certains à attendre. Avec 2 quais, 2 camions déchargent en parallèle et l'attente disparaît. Le goulot d'étranglement à Q = 1 vient entièrement du pic de 09:30.
+**Ce qu'on observe :** avec Q = 1, le solveur fait décharger certains camions en avance (p12 arrive à 09:00 pour un rendez-vous à 09:30, et décharge immédiatement). Mais le pic de 09:30 crée quand même un encombrement : p13 attend 70 min, p14 30 min, p16 20 min, p10 10 min. Avec 2 quais, tout le monde est servi sans attendre.
 
 ---
 
@@ -125,11 +125,11 @@ Conséquence : les camions occupent le quai **beaucoup plus longtemps**, ce qui 
 
 | Q | Statut | Attente totale |
 |---|---|---|
-| 1 | OPTIMAL | 192 min |
-| 2 | OPTIMAL | 76 min |
-| 3 | OPTIMAL | 8 min |
+| 1 | OPTIMAL | 0 min |
+| 2 | OPTIMAL | 0 min |
+| 3 | OPTIMAL | 0 min |
 
-**Ce qu'on observe :** l'attente explose à Q = 1 (192 min contre 70 min en v3) car le quai est occupé jusqu'à 65 min d'affilée, ce qui bloque tous les camions suivants. Même avec 3 quais, 8 min d'attente subsistent — contre 0 en version 3 — à cause des longues formalités.
+**Ce qu'on observe :** malgré des occupations de quai jusqu'à 65 min (delta + formalite), la borne d'arrivée élargie à 1440 permet au solveur d'étaler les arrivées sur toute la journée : 0 min d'attente pour tous les Q.
 
 Cette variante n'est pas reprise dans les versions 5 et 6, qui repartent de la version 3.
 
@@ -150,7 +150,7 @@ De plus, l'arrivée ne peut pas avoir lieu avant l'ouverture du site (`ouverture
 | Q | Statut | Attente totale |
 |---|---|---|
 | 1 | **INFEASIBLE** | — |
-| 2 | OPTIMAL | 50 min |
+| 2 | OPTIMAL | 60 min |
 | 3 | OPTIMAL | 20 min |
 
 #### Pourquoi Q = 1 est infaisable ici ?
@@ -173,7 +173,7 @@ Le solveur ne peut pas contourner ce problème :
 - Il ne peut pas les faire décharger en avance : `s[p] ≥ HRDV` l'en empêche.
 - Il ne peut pas décharger deux camions en parallèle : Q = 1.
 
-**Avec Q = 2**, deux camions déchargent en parallèle de 09:30 à 09:50, puis deux autres de 09:50 à 10:10. La file ne contient jamais plus de 2 camions → faisable, avec 50 min d'attente au total. **Avec Q = 3**, trois camions déchargent ensemble de 09:30 à 09:50, le 4e attend 20 min → 20 min d'attente.
+**Avec Q = 2**, deux camions déchargent en parallèle de 09:30 à 09:50, puis deux autres de 09:50 à 10:10. La file ne contient jamais plus de 2 camions → faisable, avec 60 min d'attente au total. **Avec Q = 3**, trois camions déchargent ensemble de 09:30 à 09:50, le 4e attend 20 min → 20 min d'attente.
 
 ---
 
@@ -197,11 +197,11 @@ Le poids 1000 fait qu'une minute de retard coûte autant que 1000 minutes d'atte
 
 | Q | Statut | Retard total | Camions en retard | Attente totale |
 |---|---|---|---|---|
-| 1 | OPTIMAL | 230 min | 5 | 0 min |
-| 2 | OPTIMAL | 50 min | 3 | 0 min |
+| 1 | OPTIMAL | 350 min | 8 | 0 min |
+| 2 | OPTIMAL | 60 min | 4 | 0 min |
 | 3 | OPTIMAL | 20 min | 1 | 0 min |
 
-**Ce qu'on observe :** l'attente est toujours nulle — le solveur préfère systématiquement retarder l'arrivée d'un camion plutôt que de le laisser patienter dans la file. Avec Q = 1, 5 camions arrivent après leur rendez-vous pour un retard total de 230 min. Plus on ajoute de quais, moins il faut de retard.
+**Ce qu'on observe :** l'attente est toujours nulle — le solveur préfère systématiquement retarder l'arrivée d'un camion plutôt que de le laisser patienter dans la file. Avec Q = 1, 8 camions arrivent après leur rendez-vous pour un retard total de 350 min. Plus on ajoute de quais, moins il faut de retard.
 
 ---
 
@@ -210,11 +210,11 @@ Le poids 1000 fait qu'une minute de retard coûte autant que 1000 minutes d'atte
 | Version | Fichier | Q = 1 | Q = 2 | Q = 3 |
 |---|---|---|---|---|
 | 1 — Modèle de base | `planning.py` | 0 (sans quais) | 0 | 0 |
-| 2 — Quais + file | `planning_contraintes.py` | w = 100 min | w = 5 min | w = 0 |
-| 3 — Données réelles | `entrepot.py` | w = 70 min | w = 0 | w = 0 |
-| 4 — Formalité au quai | `entrepot_avec_formalite.py` | w = 192 min | w = 76 min | w = 8 min |
-| 5 — Pas de déchargement avant HRDV | `version5.py` | **INFEASIBLE** | w = 50 min | w = 20 min |
-| 6 — Retard pénalisé | `version6.py` | r = 230 min (5 camions), w = 0 | r = 50 min (3 camions), w = 0 | r = 20 min (1 camion), w = 0 |
+| 2 — Quais + file | `planning_contraintes.py` | w = 0 min | w = 0 min | w = 0 |
+| 3 — Données réelles | `entrepot.py` | w = 130 min | w = 0 | w = 0 |
+| 4 — Formalité au quai | `entrepot_avec_formalite.py` | w = 0 min | w = 0 min | w = 0 min |
+| 5 — Pas de déchargement avant HRDV | `version5.py` | **INFEASIBLE** | w = 60 min | w = 20 min |
+| 6 — Retard pénalisé | `version6.py` | r = 350 min (8 camions), w = 0 | r = 60 min (4 camions), w = 0 | r = 20 min (1 camion), w = 0 |
 
 > Les versions 1–2 et 3–6 n'utilisent pas les mêmes données (15 vs 19 camions) : les chiffres ne se comparent qu'à l'intérieur de chaque groupe.
 
@@ -246,7 +246,7 @@ Le nombre de quais se règle en modifiant la ligne `Q = …` dans le script. Val
   "quais": 2,
   "file_max": 2,
   "statut": "OPTIMAL",
-  "attente_totale": 5,
+  "attente_totale": 0,
   "planning": [
     {
       "vehicule": "V1",
@@ -275,8 +275,8 @@ Si le problème est infaisable, `attente_totale` vaut `null` et `planning` est v
 ├── version5.py                  # V5 : déchargement au plus tôt à HRDV (infaisable à Q = 1)
 ├── version6.py                  # V6 : retard autorisé, fortement pénalisé
 ├── resultat.json                # V1
-├── resultat_Q1.json             # V2, Q = 1 (w = 100)
-├── resultat_Q2.json             # V2, Q = 2 (w = 5)
+├── resultat_Q1.json             # V2, Q = 1 (w = 0)
+├── resultat_Q2.json             # V2, Q = 2 (w = 0)
 ├── resultat_Q3.json             # V2, Q = 3 (w = 0)
 ├── ALGORITHME.md                # description détaillée du modèle et des versions
 ├── requirements.txt

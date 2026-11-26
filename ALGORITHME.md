@@ -194,8 +194,8 @@ sinon : attente_totale = None, planning = []
 
 | Q | Statut | Attente totale |
 |---|---|---|
-| 1 | OPTIMAL | 100 min |
-| 2 | OPTIMAL | 5 min (seul V15 attend) |
+| 1 | OPTIMAL | 0 min |
+| 2 | OPTIMAL | 0 min |
 | 3 | OPTIMAL | 0 min |
 
 **Pourquoi c'était INFEASIBLE avant (avec `a[C] ∈ [T−30, T]`) :**
@@ -232,7 +232,7 @@ Le modèle mathématique est identique à celui de la version 2. Seuls changent 
 
 | Q | Statut | Attente totale |
 |---|---|---|
-| 1 | OPTIMAL | 70 min (p12 : 50, p10 : 10, p14 : 10) |
+| 1 | OPTIMAL | 130 min (p13 : 70, p14 : 30, p16 : 20, p10 : 10) |
 | 2 | OPTIMAL | 0 min |
 | 3 | OPTIMAL | 0 min |
 
@@ -256,9 +256,9 @@ pour chaque p :
 
 | Q | Statut | Attente totale |
 |---|---|---|
-| 1 | OPTIMAL | 192 min |
-| 2 | OPTIMAL | 76 min |
-| 3 | OPTIMAL | 8 min |
+| 1 | OPTIMAL | 0 min |
+| 2 | OPTIMAL | 0 min |
+| 3 | OPTIMAL | 0 min |
 
 **Pourquoi c'était INFEASIBLE avant (avec `a[p] ∈ [HRDV−30, HRDV]`) :**
 p10, p12, p13 et p15 ont tous rendez-vous à 09:30. Avec `formalite_au_quai = True`, chaque camion occupe le quai pendant `delta + formalite` (entre 38 et 65 min). Ces quatre camions doivent tous passer par le quai unique, mais leurs fenêtres d'arrivée se chevauchent totalement. Le solveur ne peut pas les intercaler : il manque du temps.
@@ -293,7 +293,7 @@ Conséquences visibles dans le code et les résultats :
 | Q | Statut | Attente totale |
 |---|---|---|
 | 1 | **INFEASIBLE** | — |
-| 2 | OPTIMAL | 50 min |
+| 2 | OPTIMAL | 60 min |
 | 3 | OPTIMAL | 20 min |
 
 **Pourquoi Q = 1 est INFEASIBLE :**
@@ -348,11 +348,11 @@ afficher  retard_total, en_retard (nombre de camions avec r > 0)
 
 | Q | Statut | Retard total | Camions en retard | Attente totale | Objectif |
 |---|---|---|---|---|---|
-| 1 | OPTIMAL | 230 min | 5 | 0 min | 230 000 |
-| 2 | OPTIMAL | 50 min | 3 | 0 min | 50 000 |
+| 1 | OPTIMAL | 350 min | 8 | 0 min | 350 000 |
+| 2 | OPTIMAL | 60 min | 4 | 0 min | 60 000 |
 | 3 | OPTIMAL | 20 min | 1 | 0 min | 20 000 |
 
-L'attente devient nulle : plutôt que de faire patienter un camion dans la file, le modèle le fait partir plus tard. Par exemple, avec Q = 1, p12 part à 10:34 pour un rendez-vous à 09:30.
+L'attente devient nulle : plutôt que de faire patienter un camion dans la file, le modèle le fait partir plus tard. Par exemple, avec Q = 1, p12 part à 09:34 pour un rendez-vous à 09:30 et ne commence à décharger qu'à 10:10 (40 min de retard).
 
 ---
 
@@ -361,11 +361,11 @@ L'attente devient nulle : plutôt que de faire patienter un camion dans la file,
 | Version | Fichier | Camions | Borne d'arrivée `a` | Contrainte sur le déchargement `s` | Occupation du quai | Objectif | Q = 1 | Q = 2 | Q = 3 |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `planning.py` | 15 V | `[T−30, T]` | `s ≥ a`, aucune limite de quais | — | min Σw | 0 (sans Q) | 0 (sans Q) | 0 (sans Q) |
-| 2 | `planning_contraintes.py` | 15 V | `[T−30, 1440]` ¹ | `s ≥ a`, ≤ Q quais, file ≤ 2 | `Delta` = 20 | min Σw | w = 100 | w = 5 | w = 0 |
-| 3 | `entrepot.py` | 19 p | `[HRDV−30, HRDV]` | idem | `delta` = 20 | min Σw | w = 70 | w = 0 | w = 0 |
-| 4 | `entrepot_avec_formalite.py` | 19 p | `[HRDV−30, 1440]` ¹ | idem | `delta + formalite` | min Σw | w = 192 | w = 76 | w = 8 |
-| 5 | `version5.py` | 19 p | `[max(360, HRDV−30), HRDV]` | `s ≥ HRDV`, idem | `delta` = 20 | min Σw | INFEASIBLE | w = 50 | w = 20 |
-| 6 | `version6.py` | 19 p | `[max(360, HRDV−30), 1440]` | `s ≥ 0` ¹, `r = s − HRDV`, idem | `delta` = 20 | min 1000·Σr + Σw | r = 230, w = 0 | r = 50, w = 0 | r = 20, w = 0 |
+| 2 | `planning_contraintes.py` | 15 V | `[T−30, 1440]` ¹ | `s ≥ a`, ≤ Q quais, file ≤ 2 | `Delta` = 20 | min Σw | w = 0 | w = 0 | w = 0 |
+| 3 | `entrepot.py` | 19 p | `[HRDV−30, HRDV]` | idem | `delta` = 20 | min Σw | w = 130 | w = 0 | w = 0 |
+| 4 | `entrepot_avec_formalite.py` | 19 p | `[HRDV−30, 1440]` ¹ | idem | `delta + formalite` | min Σw | w = 0 | w = 0 | w = 0 |
+| 5 | `version5.py` | 19 p | `[max(360, HRDV−30), HRDV]` | `s ≥ HRDV`, idem | `delta` = 20 | min Σw | INFEASIBLE | w = 60 | w = 20 |
+| 6 | `version6.py` | 19 p | `[max(360, HRDV−30), 1440]` | `s ≥ 0` ¹, `r = s − HRDV`, idem | `delta` = 20 | min 1000·Σr + Σw | r = 350, w = 0 | r = 60, w = 0 | r = 20, w = 0 |
 
 ¹ Contrainte allégée pour rendre le problème faisable à Q = 1 (voir la section de chaque version pour le détail). La version 5 n'a pas d'allègement : elle reste INFEASIBLE à Q = 1 par conception.
 
