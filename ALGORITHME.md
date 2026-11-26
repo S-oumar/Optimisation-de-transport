@@ -160,7 +160,7 @@ pour chaque C :
 minimiser  sum(w.values())
 ```
 
-Il n'y a ni quai ni file : aucun intervalle, aucune contrainte cumulative. Le script écrit `resultat.json`.
+Il n'y a ni quai ni file : aucun intervalle, aucune contrainte cumulative. Le script affiche un tableau.
 
 **Pourquoi :** poser les variables et l'objectif sur un cas où l'optimum est évident, pour vérifier le modèle de base. C'est un premier essai naïf : on vérifie que le solveur tourne correctement avant d'ajouter les contraintes de capacité.
 
@@ -173,7 +173,7 @@ Il n'y a ni quai ni file : aucun intervalle, aucune contrainte cumulative. Le sc
 **Ce qui change par rapport à la version 1 :**
 
 ```
-Q = 2            # nombre de quais (le fichier contient actuellement 2)
+Q = 1            # nombre de quais (actuellement 1 dans le fichier)
 file_max = 2     # camions en attente simultanément
 
 pour chaque C :
@@ -183,14 +183,13 @@ pour chaque C :
 add_cumulative(dechargements, [1]*n, Q)
 add_cumulative(attentes,      [1]*n, file_max)
 
-si statut ∈ {OPTIMAL, FEASIBLE} : construire le planning
-sinon : attente_totale = None, planning = []
-écrire resultat_Q{Q}.json
+si statut ∈ {OPTIMAL, FEASIBLE} : afficher le tableau
+sinon : afficher "aucune solution"
 ```
 
 **Pourquoi :** la version 1 ne représente pas la ressource limitée. Cette version ajoute la capacité des quais et la taille maximale de la file, et fait du nombre de quais `Q` le paramètre étudié.
 
-**Résultats** (concordent avec `resultat_Q1/2/3.json`) :
+**Résultats :**
 
 | Q | Statut | Attente totale |
 |---|---|---|

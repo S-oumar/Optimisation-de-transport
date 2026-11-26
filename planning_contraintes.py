@@ -1,4 +1,3 @@
-import json 
 from ortools.sat.python import cp_model
 
 m = cp_model.CpModel()
@@ -57,49 +56,23 @@ m.minimize(sum(w.values()))
 solveur = cp_model.CpSolver()
 statut = solveur.solve(m) 
 
-print(solveur.status_name(statut)) 
-print("attente totale :", solveur.objective_value,"minutes") 
-
-
-
+print(solveur.status_name(statut))
 
 if statut in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-    planning = []
+    total = 0
+    print(f"{'véh':<6}{'T':>7}{'départ':>9}{'arrivée':>9}{'décharg.':>10}{'attente':>9}")
     for C, v in VEHICULES.items():
         arrivee = solveur.value(a[C])
-        planning.append({
-            "vehicule": C,
-            "T": hhmm(v["T"]),
-            "depart": hhmm(arrivee - v["trajet"]),
-            "arrivee": hhmm(arrivee),
-            "dechargement": hhmm(solveur.value(s[C])),
-            "attente": solveur.value(w[C]),
-        })
-    resultat = {
-        "quais": Q,
-        "file_max": file_max,
-        "statut": solveur.status_name(statut),
-        "attente_totale": int(solveur.objective_value),
-        "planning": planning,
-    }
+        attente = solveur.value(w[C])
+        total += attente
+        print(f"{C:<6}{hhmm(v['T']):>7}"
+              f"{hhmm(arrivee - v['trajet']):>9}"
+              f"{hhmm(arrivee):>9}"
+              f"{hhmm(solveur.value(s[C])):>10}"
+              f"{attente:>9}")
+    print(f"\nattente totale : {total} min")
 else:
-    resultat = {
-        "quais": Q,
-        "file_max": file_max,
-        "statut": solveur.status_name(statut),
-        "attente_totale": None,
-        "planning": [],
-    }
-
-with open(f"resultat_Q{Q}.json", "w", encoding="utf-8") as f:
-    json.dump(resultat, f, ensure_ascii=False, indent=2)
-
-print(resultat["statut"], resultat["attente_totale"])
-
-
-print("les horaires de departs sont :") 
-departs = {l["vehicule"]: l["depart"] for l in resultat["planning"]}
-print(departs)
+    print("aucune solution")
 
 
 

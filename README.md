@@ -225,8 +225,8 @@ Le poids 1000 fait qu'une minute de retard coûte autant que 1000 minutes d'atte
 Chaque script se lance directement :
 
 ```bash
-python planning.py                  # version 1, écrit resultat.json
-python planning_contraintes.py      # version 2, écrit resultat_Q{Q}.json
+python planning.py                  # version 1, affiche un tableau
+python planning_contraintes.py      # version 2, affiche un tableau
 python entrepot.py                  # version 3, affiche un tableau
 python entrepot_avec_formalite.py   # version 4, affiche un tableau
 python version5.py                  # version 5, INFEASIBLE à Q = 1 (affiche quand même un tableau sans sens)
@@ -235,32 +235,7 @@ python version6.py                  # version 6, affiche tableau + retard total 
 
 Le nombre de quais se règle en modifiant la ligne `Q = …` dans le script. Valeurs actuelles : `Q = 1` dans tous les scripts.
 
-> **Attention :** seul `planning_contraintes.py` vérifie le statut du solveur avant de lire la solution. Pour les versions 3 à 6, si la première ligne affichée est `INFEASIBLE`, les valeurs du tableau n'ont aucun sens. C'est notamment le cas de `version5.py` avec `Q = 1` : le tableau affiché contient des nombres arbitraires.
-
----
-
-## Format de sortie JSON (versions 1 et 2)
-
-```json
-{
-  "quais": 2,
-  "file_max": 2,
-  "statut": "OPTIMAL",
-  "attente_totale": 0,
-  "planning": [
-    {
-      "vehicule": "V1",
-      "T": "08:00",
-      "depart": "06:45",
-      "arrivee": "07:30",
-      "dechargement": "07:30",
-      "attente": 0
-    }
-  ]
-}
-```
-
-Si le problème est infaisable, `attente_totale` vaut `null` et `planning` est vide. Les champs `quais` et `file_max` n'existent que dans la version 2.
+> **Attention :** `planning.py` et `planning_contraintes.py` vérifient le statut du solveur avant d'afficher les valeurs. Pour les versions 3 à 6, si la première ligne affichée est `INFEASIBLE`, les valeurs du tableau n'ont aucun sens. C'est notamment le cas de `version5.py` avec `Q = 1` : le tableau affiché contient des nombres arbitraires.
 
 ---
 
@@ -274,10 +249,6 @@ Si le problème est infaisable, `attente_totale` vaut `null` et `planning` est v
 ├── entrepot_avec_formalite.py   # V4 : formalité comptée dans l'occupation du quai
 ├── version5.py                  # V5 : déchargement au plus tôt à HRDV (infaisable à Q = 1)
 ├── version6.py                  # V6 : retard autorisé, fortement pénalisé
-├── resultat.json                # V1
-├── resultat_Q1.json             # V2, Q = 1 (w = 0)
-├── resultat_Q2.json             # V2, Q = 2 (w = 0)
-├── resultat_Q3.json             # V2, Q = 3 (w = 0)
 ├── ALGORITHME.md                # description détaillée du modèle et des versions
 ├── requirements.txt
 └── README.md

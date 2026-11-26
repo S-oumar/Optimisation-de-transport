@@ -1,9 +1,8 @@
-import json 
 from ortools.sat.python import cp_model
 # un classeur vide pour notes les inconnues et les regles
 m = cp_model.CpModel()
 
-a, s, w = {}, {}, {} 
+a, s, w = {}, {}, {}
 VEHICULES = {
     "V1":  {"T": 480, "trajet": 45, "Delta": 20},
     "V2":  {"T": 488, "trajet": 35, "Delta": 20},
@@ -34,46 +33,29 @@ for C, v in VEHICULES.items():
     s[C] = m.new_int_var(0, 1440, f"s_{C}")
     w[C] = m.new_int_var(0, 1440, f"w_{C}")
 
-    # on ne décharge pas avant d'etre arrivé 
-    m.add(s[C] >= a[C]) 
+    # on ne décharge pas avant d'etre arrivé
+    m.add(s[C] >= a[C])
     # L'attente, c'est le temps entre l'arrivée et le début du déchargement.
     m.add(w[C] == s[C] - a[C])
 
 m.minimize(sum(w.values())) # demande au solveur de minimiser le temps d'attente total
-# w.values() recupere les 15 variables d'attente dans a et sum() fait la somme de ces variables 
+# w.values() recupere les 15 variables d'attente dans a et sum() fait la somme de ces variables
 
 
 solveur = cp_model.CpSolver()
-statut = solveur.solve(m) # lance le soveur pour trouver la solution optimale 
+statut = solveur.solve(m) # lance le soveur pour trouver la solution optimale
 
-print(solveur.status_name(statut)) # status_name traduit le statut en texte lisible.
-print("attente totale :", solveur.objective_value,"minutes") # objective_value recupere la valeur de l'objectif ( le temps d'attente total minimisé) 
+print(solveur.status_name(statut))
 
-
-
-planning = []
+total = 0
+print(f"{'véh':<6}{'T':>7}{'départ':>9}{'arrivée':>9}{'décharg.':>10}{'attente':>9}")
 for C, v in VEHICULES.items():
     arrivee = solveur.value(a[C])
-    planning.append({
-        "vehicule": C,
-        "T": hhmm(v["T"]),
-        "depart": hhmm(arrivee - v["trajet"]),
-        "arrivee": hhmm(arrivee),
-        "dechargement": hhmm(solveur.value(s[C])),
-        "attente": solveur.value(w[C]),
-    })
-
-resultat = {
-    "statut": solveur.status_name(statut),
-    "attente_totale": int(solveur.objective_value),
-    "planning": planning,
-}
-
-with open("resultat.json", "w", encoding="utf-8") as f:
-    json.dump(resultat, f, ensure_ascii=False, indent=2)
-
-print(json.dumps(resultat, ensure_ascii=False, indent=2))
-
-
-
-
+    attente = solveur.value(w[C])
+    total += attente
+    print(f"{C:<6}{hhmm(v['T']):>7}"
+          f"{hhmm(arrivee - v['trajet']):>9}"
+          f"{hhmm(arrivee):>9}"
+          f"{hhmm(solveur.value(s[C])):>10}"
+          f"{attente:>9}")
+print(f"\nattente totale : {total} min")
